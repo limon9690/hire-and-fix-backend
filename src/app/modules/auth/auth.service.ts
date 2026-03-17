@@ -157,9 +157,62 @@ const logout = async () => {
     return null;
 };
 
+const getMe = async (userId: string) => {
+    const user = await prisma.user.findUnique({
+        where: {
+            id: userId
+        },
+        include: {
+            profile: true,
+            vendorProfile: true,
+            employeeProfile: true
+        }
+    });
+
+    if (!user) {
+        throw new AppError(status.NOT_FOUND, "User not found");
+    }
+
+    const baseUser = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+    };
+
+    if (user.role === Role.USER) {
+        return {
+            ...baseUser,
+            profile: user.profile
+        };
+    }
+
+    if (user.role === Role.VENDOR) {
+        return {
+            ...baseUser,
+            profile: user.vendorProfile
+        };
+    }
+
+    if (user.role === Role.EMPLOYEE) {
+        return {
+            ...baseUser,
+            profile: user.employeeProfile
+        };
+    }
+
+    return {
+        ...baseUser,
+        profile: null
+    };
+};
+
 export const AuthServices = {
     registerUser,
     registerVendor,
     login,
-    logout
+    logout,
+    getMe
 };

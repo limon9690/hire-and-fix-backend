@@ -17,8 +17,8 @@ app.use(cookieParser());
 
 app.use('/api/v1', AppRoutes);
 
-app.get('/', (req: Request, res: Response) => {
-  res.send('Hello from Apollo Gears World!');
+app.get('/health', (req: Request, res: Response) => {
+  res.send('Server is running!');
 });
 
 

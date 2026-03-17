@@ -15,4 +15,6 @@ router.post("/login", validateRequest(authValidationSchemas.loginSchema), AuthCo
 
 router.post("/logout", auth(Role.USER, Role.VENDOR, Role.EMPLOYEE, Role.ADMIN), AuthController.logout);
 
+router.get("/me", auth(Role.USER, Role.VENDOR, Role.EMPLOYEE, Role.ADMIN), AuthController.getMe);
+
 export const AuthRoutes = router;
