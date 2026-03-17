@@ -1,9 +1,10 @@
 import bcrypt from "bcrypt";
 import status from "http-status";
+import { Role } from "../../../../prisma/generated/prisma/enums";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
-import { TUserRegisterPayload } from "./auth.validation";
-
+import { TUserRegisterPayload, TVendorRegisterPayload } from "./auth.validation";
+import { envVars } from "../../config/env";
 
 
 const registerUser = async (payload: TUserRegisterPayload) => {
@@ -17,7 +18,7 @@ const registerUser = async (payload: TUserRegisterPayload) => {
         throw new AppError(status.CONFLICT, "Email already exists");
     }
 
-    const hashedPassword = await bcrypt.hash(payload.password, 10);
+    const hashedPassword = await bcrypt.hash(payload.password, envVars.BCRYPT_SALT_ROUNDS);
 
     const user = await prisma.user.create({
         data: {
@@ -38,6 +39,82 @@ const registerUser = async (payload: TUserRegisterPayload) => {
     return user;
 };
 
+const registerVendor = async (payload: TVendorRegisterPayload) => {
+    const normalizedEmail = payload.email.toLowerCase();
+
+    return prisma.$transaction(async (tx) => {
+        const [existingUser, existingVendorProfile] = await Promise.all([
+            tx.user.findUnique({
+                where: {
+                    email: normalizedEmail
+                }
+            }),
+            tx.vendorProfile.findUnique({
+                where: {
+                    vendorName: payload.vendorName
+                }
+            })
+        ]);
+
+        if (existingUser) {
+            throw new AppError(status.CONFLICT, "Email already exists");
+        }
+
+        if (existingVendorProfile) {
+            throw new AppError(status.CONFLICT, "Vendor name already exists");
+        }
+
+        const hashedPassword = await bcrypt.hash(payload.password, envVars.BCRYPT_SALT_ROUNDS);
+
+        const user = await tx.user.create({
+            data: {
+                name: payload.name,
+                email: normalizedEmail,
+                password: hashedPassword,
+                role: Role.VENDOR
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                createdAt: true,
+                updatedAt: true
+            }
+        });
+
+        const vendorProfile = await tx.vendorProfile.create({
+            data: {
+                userId: user.id,
+                vendorName: payload.vendorName,
+                logo: payload.logo,
+                phone: payload.phone,
+                description: payload.description,
+                address: payload.address
+            },
+            select: {
+                id: true,
+                userId: true,
+                vendorName: true,
+                logo: true,
+                phone: true,
+                description: true,
+                address: true,
+                isApproved: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true
+            }
+        });
+
+        return {
+            ...user,
+            vendorProfile
+        };
+    });
+};
+
 export const AuthServices = {
-    registerUser
+    registerUser,
+    registerVendor
 };

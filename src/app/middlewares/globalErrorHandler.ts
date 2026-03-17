@@ -80,10 +80,10 @@ export const globalErrorHandler = async (err: any, req: Request, res: Response, 
 
 
     const errorResponse: IErrorResponse = {
+        statusCode,
         success: false,
         message: message,
         errorSources,
-        error: envVars.NODE_ENV === 'development' ? err : undefined,
         stack: envVars.NODE_ENV === 'development' ? stack : undefined,
     }
 
