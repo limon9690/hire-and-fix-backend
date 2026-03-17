@@ -153,8 +153,13 @@ const login = async (payload: TLoginPayload) => {
     };
 };
 
+const logout = async () => {
+    return null;
+};
+
 export const AuthServices = {
     registerUser,
     registerVendor,
-    login
+    login,
+    logout
 };

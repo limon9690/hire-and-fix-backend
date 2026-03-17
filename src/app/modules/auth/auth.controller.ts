@@ -4,7 +4,7 @@ import { AuthServices } from "./auth.service";
 import { TLoginPayload, TUserRegisterPayload, TVendorRegisterPayload } from "./auth.validation";
 import { sendResponse } from "../../utils/sendResponse";
 import status from "http-status";
-import { setAuthCookie } from "./auth.utils";
+import { clearAuthCookie, setAuthCookie } from "./auth.utils";
 
 const registerUser = catchAsync(async (req : Request, res : Response) => {
     const payload = req.body;
@@ -44,8 +44,22 @@ const login = catchAsync(async (req : Request, res : Response) => {
     });
 });
 
+const logout = catchAsync(async (req : Request, res : Response) => {
+    await AuthServices.logout();
+
+    clearAuthCookie(res);
+
+    sendResponse(res, {
+        statusCode: status.OK,
+        success: true,
+        message: "User logged out successfully",
+        data: null,
+    });
+});
+
 export const AuthController = {
     registerUser,
     registerVendor,
-    login
+    login,
+    logout
 };
