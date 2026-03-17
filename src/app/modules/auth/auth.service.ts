@@ -205,6 +205,52 @@ const login = async (payload: TLoginPayload) => {
         throw new AppError(status.UNAUTHORIZED, "Invalid email or password");
     }
 
+    // check if the user is active or if it's a vendor, check if the vendor profile is approved and active or if it's an employee, check if the employee profile is active and not delted
+    if (user.role === Role.USER) {
+        const profile = await prisma.userProfile.findUnique({
+            where: {
+                userId: user.id
+            }
+        });
+
+        if (!profile || !profile.isActive) {
+            throw new AppError(status.UNAUTHORIZED, "User account is inactive");
+        }
+    }
+
+
+    if (user.role === Role.VENDOR) {
+        const vendorProfile = await prisma.vendorProfile.findUnique({
+            where: {
+                userId: user.id
+            }
+        });
+
+        if (!vendorProfile || !vendorProfile.isApproved) {
+            throw new AppError(status.UNAUTHORIZED, "Vendor account is not approved yet");
+        }
+
+        if (!vendorProfile.isActive) {
+            throw new AppError(status.UNAUTHORIZED, "Vendor account is inactive");
+        }
+    }
+
+    if (user.role === Role.EMPLOYEE) {
+        const employeeProfile = await prisma.employeeProfile.findUnique({
+            where: {
+                userId: user.id
+            }
+        });
+
+        if (!employeeProfile || employeeProfile.isDeleted) {
+            throw new AppError(status.UNAUTHORIZED, "Employee account is deleted");
+        }
+
+        if (!employeeProfile.isActive) {
+            throw new AppError(status.UNAUTHORIZED, "Employee account is inactive");
+        }
+    }
+
     const isPasswordMatched = await bcrypt.compare(payload.password, user.password);
 
     if (!isPasswordMatched) {
