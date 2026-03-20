@@ -212,7 +212,7 @@ const login = async (payload: TLoginPayload) => {
             }
         });
 
-        if (!profile || !profile.isActive) {
+        if (profile && !profile.isActive) {
             throw new AppError(status.UNAUTHORIZED, "User account is inactive");
         }
     }
@@ -225,11 +225,11 @@ const login = async (payload: TLoginPayload) => {
             }
         });
 
-        if (!vendorProfile || !vendorProfile.isApproved) {
+        if (vendorProfile && !vendorProfile.isApproved) {
             throw new AppError(status.UNAUTHORIZED, "Vendor account is not approved yet");
         }
 
-        if (!vendorProfile.isActive) {
+        if (vendorProfile && !vendorProfile.isActive) {
             throw new AppError(status.UNAUTHORIZED, "Vendor account is inactive");
         }
     }
