@@ -4,6 +4,28 @@ import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import { TUpdateMyVendorPayload } from "./vendor.validation";
 
+const getReviewSummaryByVendorId = async (vendorId: string) => {
+    const reviewStats = await prisma.review.aggregate({
+        where: {
+            employee: {
+                vendorId,
+                isDeleted: false
+            }
+        },
+        _avg: {
+            rating: true
+        },
+        _count: {
+            _all: true
+        }
+    });
+
+    return {
+        averageRating: Number((reviewStats._avg.rating ?? 0).toFixed(2)),
+        totalReviews: reviewStats._count._all
+    };
+};
+
 const getAllVendors = async () => {
     const vendors = await prisma.vendorProfile.findMany({
         where: {
@@ -52,7 +74,23 @@ const getVendorDetails = async (id: string) => {
         throw new AppError(status.NOT_FOUND, "Vendor not found");
     }
 
-    return vendor;
+    const [employeeCount, reviewSummary] = await Promise.all([
+        prisma.employeeProfile.count({
+            where: {
+                vendorId: vendor.id,
+                isDeleted: false
+            }
+        }),
+        getReviewSummaryByVendorId(vendor.id)
+    ]);
+
+    return {
+        ...vendor,
+        reviewSummary: {
+            ...reviewSummary,
+            employeeCount
+        }
+    };
 };
 
 const updateMyVendorProfile = async (vendorUserId: string, payload: TUpdateMyVendorPayload) => {
@@ -150,7 +188,8 @@ const getDashboardSummary = async (vendorUserId: string) => {
         confirmedBookings,
         completedBookings,
         cancelledBookings,
-        revenueAggregate
+        revenueAggregate,
+        reviewSummary
     ] = await Promise.all([
         prisma.employeeProfile.count({
             where: {
@@ -196,7 +235,8 @@ const getDashboardSummary = async (vendorUserId: string) => {
             _sum: {
                 totalPrice: true
             }
-        })
+        }),
+        getReviewSummaryByVendorId(vendorProfile.id)
     ]);
 
     return {
@@ -206,7 +246,8 @@ const getDashboardSummary = async (vendorUserId: string) => {
         confirmedBookings,
         completedBookings,
         cancelledBookings,
-        totalRevenue: Number(revenueAggregate._sum.totalPrice ?? 0)
+        totalRevenue: Number(revenueAggregate._sum.totalPrice ?? 0),
+        reviewSummary
     };
 };
 
