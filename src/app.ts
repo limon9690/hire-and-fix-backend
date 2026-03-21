@@ -3,9 +3,12 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { notFound } from './app/middlewares/notFound';
 import { globalErrorHandler } from './app/middlewares/globalErrorHandler';
+import { PaymentControllers } from './app/modules/payment/payment.controller';
 import { AppRoutes } from './app/routes';
 
 const app: Application = express();
+
+app.post('/api/v1/payments/webhook', express.raw({ type: 'application/json' }), PaymentControllers.handleStripeWebhook);
 
 // parsers
 app.use(express.urlencoded({ extended: true }));
