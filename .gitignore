@@ -3,3 +3,5 @@ dist
 .env
 /prisma/generated
 docs/project-deep-dive.md
+.vercel
+api/
