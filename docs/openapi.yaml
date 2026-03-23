@@ -1,0 +1,2829 @@
+openapi: 3.0.3
+info:
+  title: Hire & Fix API
+  version: 1.0.0
+  description: |
+    REST API for Hire & Fix backend.
+    Base path is `/api/v1`.
+
+servers:
+  - url: http://localhost:5000
+    description: Local development
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Payments
+  - name: Bookings
+  - name: Vendors
+  - name: Employees
+  - name: Service Categories
+  - name: Reviews
+  - name: Admin
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns a simple server health message.
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Server is running!
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Authenticates a user and sets HTTP-only auth cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: HTTP-only auth cookie containing access token.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginSuccessResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/register-user:
+    post:
+      tags: [Auth]
+      summary: Register user
+      description: Creates a customer user account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterUserRequest"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterUserSuccessResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/register-vendor:
+    post:
+      tags: [Auth]
+      summary: Register vendor
+      description: Creates a vendor user account and vendor profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterVendorRequest"
+      responses:
+        "201":
+          description: Vendor registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterVendorSuccessResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email or vendor name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/create-employee:
+    post:
+      tags: [Auth]
+      summary: Create employee (vendor)
+      description: Creates an employee account under the authenticated vendor.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeRequest"
+      responses:
+        "201":
+          description: Employee created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateEmployeeSuccessResponse"
+        "400":
+          description: Validation/domain error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden (role not vendor)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vendor profile or service category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: Clears auth cookie for authenticated user.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: User logged out
+          headers:
+            Set-Cookie:
+              description: Cleared auth cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoutSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: Returns current authenticated user with role-specific profile.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetMeSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/payments/checkout-session/{bookingId}:
+    post:
+      tags: [Payments]
+      summary: Create Stripe checkout session
+      description: Creates a Stripe Checkout Session for the authenticated user and booking (USER role).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: bookingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSessionSuccess"
+        "400":
+          description: Invalid booking/payment state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/payments/webhook:
+    post:
+      tags: [Payments]
+      summary: Stripe webhook
+      description: Receives Stripe webhook events and finalizes payment state.
+      parameters:
+        - $ref: "#/components/parameters/StripeSignatureHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+        "400":
+          description: Signature/payload error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/bookings:
+    post:
+      tags: [Bookings]
+      summary: Create booking
+      description: Creates a new booking for authenticated user.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingRequest"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingSingleSuccessResponse"
+        "400":
+          description: Validation/domain error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Booking time conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/bookings/me:
+    get:
+      tags: [Bookings]
+      summary: Get my bookings
+      description: Returns bookings for current user/vendor/employee based on role.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortOrderParam"
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, startTime, endTime, bookingStatus, paymentStatus, totalPrice]
+        - in: query
+          name: bookingStatus
+          schema:
+            $ref: "#/components/schemas/BookingStatus"
+        - in: query
+          name: paymentStatus
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+      responses:
+        "200":
+          description: Bookings retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingListSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Related profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/bookings/{id}:
+    get:
+      tags: [Bookings]
+      summary: Get booking details
+      description: Returns booking details if requester is authorized by role/ownership.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Booking retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingSingleSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking or profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/bookings/{id}/cancel:
+    patch:
+      tags: [Bookings]
+      summary: Cancel booking (user)
+      description: User can cancel own booking before service start and if not in final non-cancellable state.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingSingleSuccessResponse"
+        "400":
+          description: Invalid cancellation state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/bookings/{id}/status:
+    patch:
+      tags: [Bookings]
+      summary: Update booking status by vendor
+      description: Vendor updates status for own booking, with transition rules.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingStatusByVendorRequest"
+      responses:
+        "200":
+          description: Booking status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingSingleSuccessResponse"
+        "400":
+          description: Invalid transition/state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking or vendor profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/bookings/{id}/employee-status:
+    patch:
+      tags: [Bookings]
+      summary: Update booking status by employee
+      description: Employee updates status for assigned booking with restricted transitions.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingStatusByEmployeeRequest"
+      responses:
+        "200":
+          description: Booking status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingSingleSuccessResponse"
+        "400":
+          description: Invalid transition/state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking or employee profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/admin/dashboard-summary:
+    get:
+      tags: [Admin]
+      summary: Get platform dashboard summary
+      description: Returns platform-level aggregate metrics (admin only).
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Dashboard summary retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboardSummarySuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/admin/users:
+    get:
+      tags: [Admin]
+      summary: Get all users
+      description: Returns paginated users list (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortOrderParam"
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [name, email, createdAt, updatedAt]
+      responses:
+        "200":
+          description: Users retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserListSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/admin/users/{id}:
+    get:
+      tags: [Admin]
+      summary: Get single user
+      description: Returns basic user with role-specific profile (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetailsSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/admin/users/{id}/status:
+    patch:
+      tags: [Admin]
+      summary: Update user active status
+      description: Updates profile `isActive` for user/vendor/employee (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserStatusRequest"
+      responses:
+        "200":
+          description: User status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetailsSuccessResponse"
+        "400":
+          description: Invalid update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/admin/vendors/{id}/approval:
+    patch:
+      tags: [Admin]
+      summary: Update vendor approval status
+      description: Approves or rejects vendor profile by id (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVendorApprovalRequest"
+      responses:
+        "200":
+          description: Vendor approval updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVendorApprovalSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vendor not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/admin/bookings:
+    get:
+      tags: [Admin]
+      summary: Get all bookings
+      description: Returns paginated bookings with optional status filters (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortOrderParam"
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, startTime, endTime, bookingStatus, paymentStatus, totalPrice]
+        - in: query
+          name: bookingStatus
+          schema:
+            $ref: "#/components/schemas/BookingStatus"
+        - in: query
+          name: paymentStatus
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+      responses:
+        "200":
+          description: Bookings retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingListSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/admin/bookings/{id}:
+    get:
+      tags: [Admin]
+      summary: Get booking details
+      description: Returns booking details by id (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Booking retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingSingleSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/admin/payments:
+    get:
+      tags: [Admin]
+      summary: Get all payments
+      description: Returns paginated payments with optional status filter (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortOrderParam"
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, updatedAt, status, amount, paidAt]
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+      responses:
+        "200":
+          description: Payments retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPaymentListSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/admin/payments/{id}:
+    get:
+      tags: [Admin]
+      summary: Get payment details
+      description: Returns payment details by id (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Payment retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPaymentSingleSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/vendors:
+    get:
+      tags: [Vendors]
+      summary: Get all vendors
+      description: Returns paginated vendors with optional filters.
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortOrderParam"
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [vendorName, isApproved, isActive]
+        - in: query
+          name: isApproved
+          schema:
+            type: boolean
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+        - in: query
+          name: vendorName
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vendors retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorListSuccessResponse"
+
+  /api/v1/vendors/{id}:
+    get:
+      tags: [Vendors]
+      summary: Get vendor details
+      description: Returns approved/active vendor details with review summary.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Vendor retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorDetailsSuccessResponse"
+        "404":
+          description: Vendor not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/vendors/me:
+    patch:
+      tags: [Vendors]
+      summary: Update my vendor profile
+      description: Updates vendor profile and optional linked user basic fields (vendor only).
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyVendorRequest"
+      responses:
+        "200":
+          description: Vendor profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorSingleSuccessResponse"
+        "400":
+          description: Validation/domain error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vendor profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email or vendor name conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/vendors/dashboard-summary:
+    get:
+      tags: [Vendors]
+      summary: Get vendor dashboard summary
+      description: Returns vendor-level booking/revenue/review aggregates (vendor only).
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Dashboard summary retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorDashboardSummarySuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vendor profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/employees:
+    get:
+      tags: [Employees]
+      summary: Get all employees
+      description: Returns paginated list of active, non-deleted employees.
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortOrderParam"
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, updatedAt, hourlyRate, experienceYears, isActive]
+      responses:
+        "200":
+          description: Employees retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeListSuccessResponse"
+
+  /api/v1/employees/{id}:
+    get:
+      tags: [Employees]
+      summary: Get employee details
+      description: Returns employee details by id.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Employee retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSingleSuccessResponse"
+        "404":
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/employees/my:
+    get:
+      tags: [Employees]
+      summary: Get my employees (vendor)
+      description: Returns paginated employees under authenticated vendor.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortOrderParam"
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, updatedAt, hourlyRate, experienceYears, isActive]
+      responses:
+        "200":
+          description: Vendor employees retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeListSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vendor profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/employees/my/{id}:
+    patch:
+      tags: [Employees]
+      summary: Update my employee (vendor)
+      description: Updates employee profile under authenticated vendor.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmployeeByVendorRequest"
+      responses:
+        "200":
+          description: Employee updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSingleSuccessResponse"
+        "400":
+          description: Validation/domain error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vendor profile/employee/service category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Employees]
+      summary: Delete my employee (vendor)
+      description: Soft deletes employee under authenticated vendor if no active bookings exist.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Employee deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSingleSuccessResponse"
+        "400":
+          description: Employee has active bookings or invalid delete state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vendor profile/employee not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/employees/me:
+    patch:
+      tags: [Employees]
+      summary: Update my employee profile
+      description: Allows authenticated employee to update limited self profile fields.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyEmployeeProfileRequest"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSingleSuccessResponse"
+        "400":
+          description: Validation/domain error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Employee profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/service-categories:
+    get:
+      tags: [Service Categories]
+      summary: Get all service categories
+      description: Returns paginated service categories.
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortOrderParam"
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [name, description]
+      responses:
+        "200":
+          description: Service categories retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCategoryListSuccessResponse"
+    post:
+      tags: [Service Categories]
+      summary: Create service category
+      description: Creates a service category (admin only).
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceCategoryRequest"
+      responses:
+        "201":
+          description: Service category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCategorySingleSuccessResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Service category already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/service-categories/{id}:
+    get:
+      tags: [Service Categories]
+      summary: Get service category details
+      description: Returns one service category by id.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Service category retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCategorySingleSuccessResponse"
+        "404":
+          description: Service category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Service Categories]
+      summary: Update service category
+      description: Updates service category fields (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceCategoryRequest"
+      responses:
+        "200":
+          description: Service category updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCategorySingleSuccessResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Service category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Service Categories]
+      summary: Delete service category
+      description: Deletes service category by id (admin only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Service category deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCategorySingleSuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Service category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/reviews:
+    post:
+      tags: [Reviews]
+      summary: Create review
+      description: Creates review for a completed booking (user only, one review per booking).
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewRequest"
+      responses:
+        "201":
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSingleSuccessResponse"
+        "400":
+          description: Validation/domain error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Review already exists for booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/reviews/{id}:
+    patch:
+      tags: [Reviews]
+      summary: Update review
+      description: Updates own review for completed booking (user only).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReviewRequest"
+      responses:
+        "200":
+          description: Review updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSingleSuccessResponse"
+        "400":
+          description: Validation/domain error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Review not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/reviews/employee/{employeeId}:
+    get:
+      tags: [Reviews]
+      summary: Get reviews by employee
+      description: Public endpoint to retrieve paginated reviews and rating summary for an employee.
+      parameters:
+        - in: path
+          name: employeeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortOrderParam"
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, updatedAt, rating]
+      responses:
+        "200":
+          description: Reviews retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewListByEmployeeSuccessResponse"
+        "404":
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  parameters:
+    PageParam:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+    SortOrderParam:
+      in: query
+      name: sortOrder
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+    StripeSignatureHeader:
+      in: header
+      name: stripe-signature
+      required: true
+      schema:
+        type: string
+      description: Stripe webhook signature header used for event verification.
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
+
+  schemas:
+    Role:
+      type: string
+      enum: [USER, VENDOR, EMPLOYEE, ADMIN]
+
+    BookingStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, IN_PROGRESS, COMPLETED, REJECTED, CANCELLED]
+
+    PaymentStatus:
+      type: string
+      enum: [PENDING, SUCCESSFUL, FAILED]
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: michael.carter@brightfix.com
+        password:
+          type: string
+          example: strongPassword123
+
+    RegisterUserRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          example: Michael Carter
+        email:
+          type: string
+          format: email
+          example: michael.carter@example.com
+        password:
+          type: string
+          minLength: 8
+          example: strongPassword123
+
+    RegisterVendorRequest:
+      allOf:
+        - $ref: "#/components/schemas/RegisterUserRequest"
+        - type: object
+          required: [vendorName, phone, description, address]
+          properties:
+            vendorName:
+              type: string
+              example: BrightFix Home Services Co. LTD
+            logo:
+              type: string
+              format: uri
+              example: https://example.com/logo.png
+            phone:
+              type: string
+              example: "+1-555-210-7788"
+            description:
+              type: string
+              example: Reliable plumbing, electrical and home maintenance services.
+            address:
+              type: string
+              example: 2457 Green Valley Ave, Dallas, TX 75201
+
+    CreateEmployeeRequest:
+      allOf:
+        - $ref: "#/components/schemas/RegisterUserRequest"
+        - type: object
+          required: [serviceCategoryId, profilePhoto, bio, address, phone, hourlyRate, experienceYears]
+          properties:
+            serviceCategoryId:
+              type: string
+              format: uuid
+            profilePhoto:
+              type: string
+              format: uri
+              example: https://example.com/employee-photo.jpg
+            bio:
+              type: string
+              example: Experienced electrician and appliance technician.
+            address:
+              type: string
+              example: 101 Maple Street, Dallas, TX 75202
+            phone:
+              type: string
+              example: "+1-555-444-1234"
+            hourlyRate:
+              type: number
+              example: 30
+            experienceYears:
+              type: integer
+              minimum: 0
+              example: 5
+
+    UserBasic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/Role"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    VendorProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        vendorName:
+          type: string
+        logo:
+          type: string
+          nullable: true
+        phone:
+          type: string
+        description:
+          type: string
+        address:
+          type: string
+        isApproved:
+          type: boolean
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    EmployeeProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        serviceCategoryId:
+          type: string
+          format: uuid
+        profilePhoto:
+          type: string
+        bio:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        hourlyRate:
+          type: number
+        experienceYears:
+          type: integer
+        isActive:
+          type: boolean
+        isDeleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ErrorSource:
+      type: object
+      properties:
+        path:
+          type: string
+          example: email
+        message:
+          type: string
+          example: Email must be valid
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Validation Error
+        errorSources:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorSource"
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 42
+        totalPages:
+          type: integer
+          example: 5
+
+    StandardSuccess:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation successful
+        data:
+          type: object
+          additionalProperties: true
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    RegisterUserSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: User registered successfully
+        data:
+          $ref: "#/components/schemas/UserBasic"
+
+    RegisterVendorResponseData:
+      allOf:
+        - $ref: "#/components/schemas/UserBasic"
+        - type: object
+          properties:
+            vendorProfile:
+              $ref: "#/components/schemas/VendorProfile"
+
+    RegisterVendorSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Vendor registered successfully
+        data:
+          $ref: "#/components/schemas/RegisterVendorResponseData"
+
+    CreateEmployeeResponseData:
+      allOf:
+        - $ref: "#/components/schemas/UserBasic"
+        - type: object
+          properties:
+            employeeProfile:
+              $ref: "#/components/schemas/EmployeeProfile"
+
+    CreateEmployeeSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Employee created successfully
+        data:
+          $ref: "#/components/schemas/CreateEmployeeResponseData"
+
+    LoginSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: User logged in successfully
+        data:
+          $ref: "#/components/schemas/UserBasic"
+
+    LogoutSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: User logged out successfully
+        data:
+          nullable: true
+          example: null
+
+    GetMeResponseData:
+      allOf:
+        - $ref: "#/components/schemas/UserBasic"
+        - type: object
+          properties:
+            profile:
+              type: object
+              nullable: true
+              additionalProperties: true
+
+    GetMeSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: User retrieved successfully
+        data:
+          $ref: "#/components/schemas/GetMeResponseData"
+
+    CheckoutSessionData:
+      type: object
+      properties:
+        checkoutUrl:
+          type: string
+          format: uri
+          example: https://checkout.stripe.com/c/pay/cs_test_...
+        sessionId:
+          type: string
+          example: cs_test_a1b2c3
+        payment:
+          $ref: "#/components/schemas/PaymentEntity"
+
+    CheckoutSessionSuccess:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Checkout session created successfully
+        data:
+          $ref: "#/components/schemas/CheckoutSessionData"
+
+    CreateBookingRequest:
+      type: object
+      required: [employeeId, startTime, endTime, serviceAddress]
+      properties:
+        employeeId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          format: date-time
+          description: ISO datetime with timezone offset.
+          example: 2026-03-25T10:00:00+08:00
+        endTime:
+          type: string
+          format: date-time
+          description: ISO datetime with timezone offset.
+          example: 2026-03-25T12:00:00+08:00
+        serviceAddress:
+          type: string
+          example: 88 Westwood Ave, Dallas, TX 75206
+        note:
+          type: string
+          nullable: true
+          example: Please bring basic tool kit.
+
+    UpdateBookingStatusByVendorRequest:
+      type: object
+      required: [bookingStatus]
+      properties:
+        bookingStatus:
+          type: string
+          enum: [ACCEPTED, REJECTED, IN_PROGRESS, COMPLETED, CANCELLED]
+
+    UpdateBookingStatusByEmployeeRequest:
+      type: object
+      required: [bookingStatus]
+      properties:
+        bookingStatus:
+          type: string
+          enum: [IN_PROGRESS, COMPLETED]
+
+    BookingEntity:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        employeeId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        serviceAddress:
+          type: string
+        note:
+          type: string
+          nullable: true
+        totalPrice:
+          type: number
+          example: 60
+        bookingStatus:
+          $ref: "#/components/schemas/BookingStatus"
+        paymentStatus:
+          $ref: "#/components/schemas/PaymentStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          additionalProperties: true
+        vendor:
+          type: object
+          additionalProperties: true
+        employee:
+          type: object
+          additionalProperties: true
+        payment:
+          type: object
+          nullable: true
+          additionalProperties: true
+        review:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    BookingSingleSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Booking retrieved successfully
+        data:
+          $ref: "#/components/schemas/BookingEntity"
+
+    BookingListSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Bookings retrieved successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingEntity"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    AdminDashboardSummaryData:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalVendors:
+          type: integer
+        totalEmployees:
+          type: integer
+        totalAdmins:
+          type: integer
+        totalBookings:
+          type: integer
+        pendingBookings:
+          type: integer
+        completedBookings:
+          type: integer
+        cancelledBookings:
+          type: integer
+        totalPayments:
+          type: integer
+        pendingPayments:
+          type: integer
+        failedPayments:
+          type: integer
+        approvedVendors:
+          type: integer
+        totalRevenue:
+          type: number
+
+    AdminDashboardSummarySuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Dashboard summary retrieved successfully
+        data:
+          $ref: "#/components/schemas/AdminDashboardSummaryData"
+
+    UpdateUserStatusRequest:
+      type: object
+      required: [isActive]
+      properties:
+        isActive:
+          type: boolean
+
+    UpdateVendorApprovalRequest:
+      type: object
+      required: [isApproved]
+      properties:
+        isApproved:
+          type: boolean
+
+    AdminUserDetailsData:
+      allOf:
+        - $ref: "#/components/schemas/UserBasic"
+        - type: object
+          properties:
+            profile:
+              type: object
+              nullable: true
+              additionalProperties: true
+
+    AdminUserDetailsSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: User retrieved successfully
+        data:
+          $ref: "#/components/schemas/AdminUserDetailsData"
+
+    AdminUserListSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Users retrieved successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserBasic"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    PaymentEntity:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        paymentMethod:
+          type: string
+        transactionId:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        booking:
+          type: object
+          additionalProperties: true
+
+    AdminPaymentListSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Payments retrieved successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentEntity"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    AdminPaymentSingleSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Payment retrieved successfully
+        data:
+          $ref: "#/components/schemas/PaymentEntity"
+
+    AdminVendorApprovalSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Vendor approval status updated successfully
+        data:
+          allOf:
+            - $ref: "#/components/schemas/VendorProfile"
+            - type: object
+              properties:
+                user:
+                  $ref: "#/components/schemas/UserBasic"
+
+    ReviewSummary:
+      type: object
+      properties:
+        averageRating:
+          type: number
+          example: 4.6
+        totalReviews:
+          type: integer
+          example: 28
+
+    VendorDetailsData:
+      allOf:
+        - $ref: "#/components/schemas/VendorProfile"
+        - type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/UserBasic"
+            reviewSummary:
+              allOf:
+                - $ref: "#/components/schemas/ReviewSummary"
+                - type: object
+                  properties:
+                    employeeCount:
+                      type: integer
+                      example: 8
+
+    VendorSingleSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Vendor profile updated successfully
+        data:
+          allOf:
+            - $ref: "#/components/schemas/VendorProfile"
+            - type: object
+              properties:
+                user:
+                  $ref: "#/components/schemas/UserBasic"
+
+    VendorDetailsSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Vendor retrieved successfully
+        data:
+          $ref: "#/components/schemas/VendorDetailsData"
+
+    VendorListSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Vendors retrieved successfully
+        data:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/VendorProfile"
+              - type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/UserBasic"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    UpdateMyVendorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        vendorName:
+          type: string
+        logo:
+          type: string
+        phone:
+          type: string
+        description:
+          type: string
+        address:
+          type: string
+      minProperties: 1
+
+    VendorDashboardSummaryData:
+      type: object
+      properties:
+        totalEmployees:
+          type: integer
+        totalBookings:
+          type: integer
+        pendingBookings:
+          type: integer
+        confirmedBookings:
+          type: integer
+        completedBookings:
+          type: integer
+        cancelledBookings:
+          type: integer
+        totalRevenue:
+          type: number
+        reviewSummary:
+          $ref: "#/components/schemas/ReviewSummary"
+
+    VendorDashboardSummarySuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Dashboard summary retrieved successfully
+        data:
+          $ref: "#/components/schemas/VendorDashboardSummaryData"
+
+    EmployeeDetailsData:
+      allOf:
+        - $ref: "#/components/schemas/EmployeeProfile"
+        - type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/UserBasic"
+            vendor:
+              $ref: "#/components/schemas/VendorProfile"
+            serviceCategory:
+              type: object
+              additionalProperties: true
+
+    EmployeeSingleSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Employee retrieved successfully
+        data:
+          $ref: "#/components/schemas/EmployeeDetailsData"
+
+    EmployeeListSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Employees retrieved successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmployeeDetailsData"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    UpdateEmployeeByVendorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        serviceCategoryId:
+          type: string
+          format: uuid
+        profilePhoto:
+          type: string
+          format: uri
+        bio:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        hourlyRate:
+          type: number
+        experienceYears:
+          type: integer
+          minimum: 0
+        isActive:
+          type: boolean
+      minProperties: 1
+
+    UpdateMyEmployeeProfileRequest:
+      type: object
+      properties:
+        profilePhoto:
+          type: string
+          format: uri
+        bio:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+      minProperties: 1
+
+    ServiceCategoryEntity:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Plumbing
+        description:
+          type: string
+          nullable: true
+          example: Plumbing installation and maintenance services.
+
+    CreateServiceCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          example: Plumbing
+        description:
+          type: string
+          example: Plumbing installation and maintenance services.
+
+    UpdateServiceCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+      minProperties: 1
+
+    ServiceCategorySingleSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Service category retrieved successfully
+        data:
+          $ref: "#/components/schemas/ServiceCategoryEntity"
+
+    ServiceCategoryListSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Service categories retrieved successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceCategoryEntity"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    CreateReviewRequest:
+      type: object
+      required: [bookingId, rating]
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        comment:
+          type: string
+          example: Great service and very professional.
+
+    UpdateReviewRequest:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+      minProperties: 1
+
+    ReviewEntity:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        employeeId:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          additionalProperties: true
+        employee:
+          type: object
+          additionalProperties: true
+        booking:
+          type: object
+          additionalProperties: true
+
+    ReviewSingleSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Review updated successfully
+        data:
+          $ref: "#/components/schemas/ReviewEntity"
+
+    ReviewListByEmployeeData:
+      type: object
+      properties:
+        averageRating:
+          type: number
+          example: 4.67
+        totalReviews:
+          type: integer
+          example: 24
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewEntity"
+
+    ReviewListByEmployeeSuccessResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Reviews retrieved successfully
+        data:
+          $ref: "#/components/schemas/ReviewListByEmployeeData"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"

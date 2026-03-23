@@ -121,6 +121,8 @@ Use the generated `whsec_...` as `STRIPE_WEBHOOK_SECRET`.
 - `pnpm format`
 
 ## Documentation
+- API Docs (Swagger UI): `http://localhost:5000/docs`
+- OpenAPI Spec: [docs/openapi.yaml](docs/openapi.yaml)
 - [Architecture Overview](docs/architecture.md)
 
 ## Notes
