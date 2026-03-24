@@ -14,7 +14,17 @@ const getAllEmployees = catchAsync(async (req: Request, res: Response) => {
         allowedSortFields: ["createdAt", "updatedAt", "hourlyRate", "experienceYears", "isActive"]
     });
 
-    const result = await EmployeeServices.getAllEmployees(queryOptions);
+    const searchTerm = typeof req.query.searchTerm === "string"
+        ? req.query.searchTerm.trim()
+        : undefined;
+    const serviceCategoryId = typeof req.query.serviceCategoryId === "string"
+        ? req.query.serviceCategoryId
+        : undefined;
+
+    const result = await EmployeeServices.getAllEmployees(queryOptions, {
+        searchTerm: searchTerm || undefined,
+        serviceCategoryId
+    });
 
     sendResponse(res, {
         statusCode: status.OK,

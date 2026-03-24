@@ -4,4 +4,4 @@ dist
 /prisma/generated
 docs/project-deep-dive.md
 .vercel
-api/
+AGENTS.md

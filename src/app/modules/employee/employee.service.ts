@@ -34,10 +34,47 @@ const employeeDetailsInclude = {
     serviceCategory: true
 } as const;
 
-const getAllEmployees = async (queryOptions: TQueryOptions) => {
+type TEmployeeListFilters = {
+    searchTerm?: string;
+    serviceCategoryId?: string;
+};
+
+const getAllEmployees = async (
+    queryOptions: TQueryOptions,
+    filters: TEmployeeListFilters = {}
+) => {
     const whereClause = {
         isDeleted: false,
-        isActive: true
+        isActive: true,
+        ...(filters.serviceCategoryId ? { serviceCategoryId: filters.serviceCategoryId } : {}),
+        ...(filters.searchTerm
+            ? {
+                OR: [
+                    {
+                        user: {
+                            name: {
+                                contains: filters.searchTerm,
+                                mode: "insensitive" as const
+                            }
+                        }
+                    },
+                    {
+                        serviceCategory: {
+                            name: {
+                                contains: filters.searchTerm,
+                                mode: "insensitive" as const
+                            }
+                        }
+                    },
+                    {
+                        bio: {
+                            contains: filters.searchTerm,
+                            mode: "insensitive" as const
+                        }
+                    }
+                ]
+            }
+            : {})
     };
 
     const [employees, total] = await Promise.all([

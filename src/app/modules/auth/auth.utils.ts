@@ -23,7 +23,7 @@ export const setAuthCookie = (res: Response, token: string) => {
     res.cookie("accessToken", token, {
         httpOnly: true,
         secure: envVars.NODE_ENV === "production",
-        sameSite: "lax"
+        sameSite: "none"
     });
 };
 
@@ -31,6 +31,6 @@ export const clearAuthCookie = (res: Response) => {
     res.clearCookie("accessToken", {
         httpOnly: true,
         secure: envVars.NODE_ENV === "production",
-        sameSite: "lax"
+        sameSite: "none"
     });
 };
