@@ -37,6 +37,7 @@ const employeeDetailsInclude = {
 type TEmployeeListFilters = {
     searchTerm?: string;
     serviceCategoryId?: string;
+    isActive?: boolean;
 };
 
 const getAllEmployees = async (
@@ -114,7 +115,11 @@ const getEmployeeDetails = async (id: string) => {
     return employee;
 };
 
-const getMyEmployees = async (vendorUserId: string, queryOptions: TQueryOptions) => {
+const getMyEmployees = async (
+    vendorUserId: string,
+    queryOptions: TQueryOptions,
+    filters: TEmployeeListFilters = {}
+) => {
     const vendorProfile = await prisma.vendorProfile.findUnique({
         where: {
             userId: vendorUserId
@@ -127,7 +132,37 @@ const getMyEmployees = async (vendorUserId: string, queryOptions: TQueryOptions)
 
     const whereClause = {
         vendorId: vendorProfile.id,
-        isDeleted: false
+        isDeleted: false,
+        ...(filters.serviceCategoryId ? { serviceCategoryId: filters.serviceCategoryId } : {}),
+        ...(filters.isActive !== undefined ? { isActive: filters.isActive } : {}),
+        ...(filters.searchTerm
+            ? {
+                OR: [
+                    {
+                        user: {
+                            name: {
+                                contains: filters.searchTerm,
+                                mode: "insensitive" as const
+                            }
+                        }
+                    },
+                    {
+                        serviceCategory: {
+                            name: {
+                                contains: filters.searchTerm,
+                                mode: "insensitive" as const
+                            }
+                        }
+                    },
+                    {
+                        bio: {
+                            contains: filters.searchTerm,
+                            mode: "insensitive" as const
+                        }
+                    }
+                ]
+            }
+            : {})
     };
 
     const [employees, total] = await Promise.all([
