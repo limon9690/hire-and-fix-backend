@@ -2711,7 +2711,7 @@ var getEmployeeDetails = async (id) => {
   }
   return employee;
 };
-var getMyEmployees = async (vendorUserId, queryOptions) => {
+var getMyEmployees = async (vendorUserId, queryOptions, filters = {}) => {
   const vendorProfile = await prisma.vendorProfile.findUnique({
     where: {
       userId: vendorUserId
@@ -2722,7 +2722,35 @@ var getMyEmployees = async (vendorUserId, queryOptions) => {
   }
   const whereClause = {
     vendorId: vendorProfile.id,
-    isDeleted: false
+    isDeleted: false,
+    ...filters.serviceCategoryId ? { serviceCategoryId: filters.serviceCategoryId } : {},
+    ...filters.isActive !== void 0 ? { isActive: filters.isActive } : {},
+    ...filters.searchTerm ? {
+      OR: [
+        {
+          user: {
+            name: {
+              contains: filters.searchTerm,
+              mode: "insensitive"
+            }
+          }
+        },
+        {
+          serviceCategory: {
+            name: {
+              contains: filters.searchTerm,
+              mode: "insensitive"
+            }
+          }
+        },
+        {
+          bio: {
+            contains: filters.searchTerm,
+            mode: "insensitive"
+          }
+        }
+      ]
+    } : {}
   };
   const [employees, total] = await Promise.all([
     prisma.employeeProfile.findMany({
@@ -2942,7 +2970,14 @@ var getMyEmployees2 = catchAsync(async (req, res) => {
     defaultSortBy: "createdAt",
     allowedSortFields: ["createdAt", "updatedAt", "hourlyRate", "experienceYears", "isActive"]
   });
-  const result = await EmployeeServices.getMyEmployees(req.user.userId, queryOptions);
+  const searchTerm = typeof req.query.searchTerm === "string" ? req.query.searchTerm.trim() : void 0;
+  const serviceCategoryId = typeof req.query.serviceCategoryId === "string" ? req.query.serviceCategoryId : void 0;
+  const isActive = typeof req.query.isActive === "string" ? req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : void 0 : void 0;
+  const result = await EmployeeServices.getMyEmployees(req.user.userId, queryOptions, {
+    searchTerm: searchTerm || void 0,
+    serviceCategoryId,
+    isActive
+  });
   sendResponse(res, {
     statusCode: status15.OK,
     success: true,
@@ -3609,9 +3644,9 @@ var getAllVendors = async (queryOptions, filters) => {
   const whereClause = {
     ...filters.isActive !== void 0 && { isActive: filters.isActive },
     ...filters.isApproved !== void 0 && { isApproved: filters.isApproved },
-    ...filters.vendorName && {
+    ...filters.searchTerm && {
       vendorName: {
-        contains: filters.vendorName,
+        contains: filters.searchTerm,
         mode: "insensitive"
       }
     }
@@ -3827,11 +3862,11 @@ var getAllVendors2 = catchAsync(async (req, res) => {
   });
   const isApproved = parseBooleanQuery(req.query.isApproved);
   const isActive = parseBooleanQuery(req.query.isActive);
-  const vendorName = typeof req.query.vendorName === "string" ? req.query.vendorName.trim() : void 0;
+  const searchTerm = typeof req.query.searchTerm === "string" ? req.query.searchTerm.trim() : void 0;
   const result = await VendorServices.getAllVendors(queryOptions, {
     isApproved,
     isActive,
-    vendorName: vendorName && vendorName.length > 0 ? vendorName : void 0
+    searchTerm: searchTerm && searchTerm.length > 0 ? searchTerm : void 0
   });
   sendResponse(res, {
     statusCode: status21.OK,

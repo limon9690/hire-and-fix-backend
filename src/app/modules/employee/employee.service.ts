@@ -132,7 +132,6 @@ const getMyEmployees = async (
 
     const whereClause = {
         vendorId: vendorProfile.id,
-        isDeleted: false,
         ...(filters.serviceCategoryId ? { serviceCategoryId: filters.serviceCategoryId } : {}),
         ...(filters.isActive !== undefined ? { isActive: filters.isActive } : {}),
         ...(filters.searchTerm
