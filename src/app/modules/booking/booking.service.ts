@@ -429,6 +429,13 @@ const updateBookingStatusByVendor = async (
         throw new AppError(status.BAD_REQUEST, "Booking cannot start before service start time");
     }
 
+    if (
+        targetStatus === BookingStatus.COMPLETED &&
+        booking.paymentStatus !== PaymentStatus.SUCCESSFUL
+    ) {
+        throw new AppError(status.BAD_REQUEST, "Booking cannot be completed before payment is successful");
+    }
+
     if (targetStatus === BookingStatus.COMPLETED && now < booking.endTime) {
         throw new AppError(status.BAD_REQUEST, "Booking cannot be completed before service end time");
     }
@@ -496,6 +503,13 @@ const updateBookingStatusByEmployee = async (
 
     if (targetStatus === BookingStatus.IN_PROGRESS && now < booking.startTime) {
         throw new AppError(status.BAD_REQUEST, "Booking cannot start before service start time");
+    }
+
+    if (
+        targetStatus === BookingStatus.COMPLETED &&
+        booking.paymentStatus !== PaymentStatus.SUCCESSFUL
+    ) {
+        throw new AppError(status.BAD_REQUEST, "Booking cannot be completed before payment is successful");
     }
 
     if (targetStatus === BookingStatus.COMPLETED && now < booking.endTime) {

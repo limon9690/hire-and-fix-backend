@@ -2722,7 +2722,6 @@ var getMyEmployees = async (vendorUserId, queryOptions, filters = {}) => {
   }
   const whereClause = {
     vendorId: vendorProfile.id,
-    isDeleted: false,
     ...filters.serviceCategoryId ? { serviceCategoryId: filters.serviceCategoryId } : {},
     ...filters.isActive !== void 0 ? { isActive: filters.isActive } : {},
     ...filters.searchTerm ? {
