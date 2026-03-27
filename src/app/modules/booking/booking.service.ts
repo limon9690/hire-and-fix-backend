@@ -72,6 +72,7 @@ const bookingIncludeConfig = {
 
 const BOOKING_WINDOW_START_MINUTES = 9 * 60;
 const BOOKING_WINDOW_END_MINUTES = 17 * 60;
+const STATUS_TIME_GRACE_MS = 30 * 1000;
 
 type TGetMyBookingsFilters = {
     bookingStatus?: BookingStatus;
@@ -423,9 +424,11 @@ const updateBookingStatusByVendor = async (
         );
     }
 
-    const now = new Date();
+    const now = Date.now();
+    const startTime = booking.startTime.getTime();
+    const endTime = booking.endTime.getTime();
 
-    if (targetStatus === BookingStatus.IN_PROGRESS && now < booking.startTime) {
+    if (targetStatus === BookingStatus.IN_PROGRESS && (now + STATUS_TIME_GRACE_MS) < startTime) {
         throw new AppError(status.BAD_REQUEST, "Booking cannot start before service start time");
     }
 
@@ -436,7 +439,7 @@ const updateBookingStatusByVendor = async (
         throw new AppError(status.BAD_REQUEST, "Booking cannot be completed before payment is successful");
     }
 
-    if (targetStatus === BookingStatus.COMPLETED && now < booking.endTime) {
+    if (targetStatus === BookingStatus.COMPLETED && now < endTime) {
         throw new AppError(status.BAD_REQUEST, "Booking cannot be completed before service end time");
     }
 
@@ -499,9 +502,11 @@ const updateBookingStatusByEmployee = async (
         );
     }
 
-    const now = new Date();
+    const now = Date.now();
+    const startTime = booking.startTime.getTime();
+    const endTime = booking.endTime.getTime();
 
-    if (targetStatus === BookingStatus.IN_PROGRESS && now < booking.startTime) {
+    if (targetStatus === BookingStatus.IN_PROGRESS && (now + STATUS_TIME_GRACE_MS) < startTime) {
         throw new AppError(status.BAD_REQUEST, "Booking cannot start before service start time");
     }
 
@@ -512,7 +517,7 @@ const updateBookingStatusByEmployee = async (
         throw new AppError(status.BAD_REQUEST, "Booking cannot be completed before payment is successful");
     }
 
-    if (targetStatus === BookingStatus.COMPLETED && now < booking.endTime) {
+    if (targetStatus === BookingStatus.COMPLETED && now < endTime) {
         throw new AppError(status.BAD_REQUEST, "Booking cannot be completed before service end time");
     }
 

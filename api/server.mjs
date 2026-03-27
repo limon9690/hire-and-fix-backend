@@ -3591,16 +3591,35 @@ var createServiceCategory = async (payload) => {
   });
   return serviceCategory;
 };
-var getAllServiceCategories = async (queryOptions) => {
+var getAllServiceCategories = async (queryOptions, searchTerm) => {
+  const whereClause = searchTerm ? {
+    OR: [
+      {
+        name: {
+          contains: searchTerm,
+          mode: "insensitive"
+        }
+      },
+      {
+        description: {
+          contains: searchTerm,
+          mode: "insensitive"
+        }
+      }
+    ]
+  } : {};
   const [serviceCategories, total] = await Promise.all([
     prisma.serviceCategory.findMany({
+      where: whereClause,
       skip: queryOptions.skip,
       take: queryOptions.limit,
       orderBy: {
         [queryOptions.sortBy]: queryOptions.sortOrder
       }
     }),
-    prisma.serviceCategory.count()
+    prisma.serviceCategory.count({
+      where: whereClause
+    })
   ]);
   return {
     data: serviceCategories,
@@ -3690,7 +3709,11 @@ var getAllServiceCategories2 = catchAsync(async (req, res) => {
     defaultSortBy: "name",
     allowedSortFields: ["name", "description"]
   });
-  const result = await ServiceCategoryServices.getAllServiceCategories(queryOptions);
+  const searchTerm = typeof req.query.searchTerm === "string" ? req.query.searchTerm.trim() : void 0;
+  const result = await ServiceCategoryServices.getAllServiceCategories(
+    queryOptions,
+    searchTerm || void 0
+  );
   sendResponse(res, {
     statusCode: status19.OK,
     success: true,
