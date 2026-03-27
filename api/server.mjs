@@ -693,6 +693,11 @@ var createCheckoutSession = async (bookingId, userId) => {
     });
     return upsertedPayment;
   });
+  const successUrl = new URL(envVars.CLIENT_SUCCESS_URL);
+  successUrl.searchParams.set("bookingId", booking.id);
+  successUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+  const cancelUrl = new URL(envVars.CLIENT_CANCEL_URL);
+  cancelUrl.searchParams.set("bookingId", booking.id);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
@@ -708,8 +713,8 @@ var createCheckoutSession = async (bookingId, userId) => {
         }
       }
     ],
-    success_url: envVars.CLIENT_SUCCESS_URL,
-    cancel_url: envVars.CLIENT_CANCEL_URL,
+    success_url: successUrl.toString(),
+    cancel_url: cancelUrl.toString(),
     client_reference_id: booking.id,
     metadata: {
       bookingId: booking.id,
@@ -2337,6 +2342,9 @@ var updateBookingStatusByVendor = async (vendorUserId, bookingId, payload) => {
   if (targetStatus === BookingStatus.IN_PROGRESS && now < booking.startTime) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot start before service start time");
   }
+  if (targetStatus === BookingStatus.COMPLETED && booking.paymentStatus !== PaymentStatus.SUCCESSFUL) {
+    throw new AppError_default(status12.BAD_REQUEST, "Booking cannot be completed before payment is successful");
+  }
   if (targetStatus === BookingStatus.COMPLETED && now < booking.endTime) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot be completed before service end time");
   }
@@ -2387,6 +2395,9 @@ var updateBookingStatusByEmployee = async (employeeUserId, bookingId, payload) =
   const now = /* @__PURE__ */ new Date();
   if (targetStatus === BookingStatus.IN_PROGRESS && now < booking.startTime) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot start before service start time");
+  }
+  if (targetStatus === BookingStatus.COMPLETED && booking.paymentStatus !== PaymentStatus.SUCCESSFUL) {
+    throw new AppError_default(status12.BAD_REQUEST, "Booking cannot be completed before payment is successful");
   }
   if (targetStatus === BookingStatus.COMPLETED && now < booking.endTime) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot be completed before service end time");

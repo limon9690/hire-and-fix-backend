@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import status from "http-status";
-import { BookingStatus, PaymentStatus } from "../../../../prisma/generated/prisma/enums";
+import { BookingStatus, PaymentStatus, Role } from "../../../../prisma/generated/prisma/enums";
 import { sendResponse } from "../../utils/sendResponse";
 import { catchAsync } from "../../utils/catchAsync";
 import { parseQueryOptions } from "../../utils/queryHelpers";
@@ -34,7 +34,26 @@ const getAllUsers = catchAsync(async (req: Request, res: Response) => {
         allowedSortFields: ["name", "email", "createdAt", "updatedAt"]
     });
 
-    const result = await AdminServices.getAllUsers(queryOptions);
+    const searchTerm = typeof req.query.searchTerm === "string"
+        ? req.query.searchTerm.trim()
+        : undefined;
+    const role = getEnumQueryValue(
+        req.query.role,
+        Object.values(Role) as Role[]
+    );
+    const isActive = typeof req.query.isActive === "string"
+        ? req.query.isActive === "true"
+            ? true
+            : req.query.isActive === "false"
+                ? false
+                : undefined
+        : undefined;
+
+    const result = await AdminServices.getAllUsers(queryOptions, {
+        searchTerm: searchTerm || undefined,
+        role,
+        isActive
+    });
 
     sendResponse(res, {
         statusCode: status.OK,

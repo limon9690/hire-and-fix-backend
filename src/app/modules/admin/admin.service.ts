@@ -66,6 +66,12 @@ type TGetAllPaymentsFilters = {
     status?: PaymentStatus;
 };
 
+type TGetAllUsersFilters = {
+    searchTerm?: string;
+    role?: Role;
+    isActive?: boolean;
+};
+
 const getDashboardSummary = async () => {
     const [
         totalUsers,
@@ -161,9 +167,41 @@ const getDashboardSummary = async () => {
     };
 };
 
-const getAllUsers = async (queryOptions: TQueryOptions) => {
+const getAllUsers = async (queryOptions: TQueryOptions, filters: TGetAllUsersFilters = {}) => {
+    const whereClause = {
+        ...(filters.role && { role: filters.role }),
+        ...(filters.searchTerm && {
+            OR: [
+                {
+                    name: {
+                        contains: filters.searchTerm,
+                        mode: "insensitive" as const
+                    }
+                },
+                {
+                    email: {
+                        contains: filters.searchTerm,
+                        mode: "insensitive" as const
+                    }
+                }
+            ]
+        }),
+        ...(filters.isActive !== undefined
+            ? {
+                ...(filters.role === Role.USER
+                    ? { profile: { is: { isActive: filters.isActive } } }
+                    : filters.role === Role.VENDOR
+                        ? { vendorProfile: { is: { isActive: filters.isActive } } }
+                        : filters.role === Role.EMPLOYEE
+                            ? { employeeProfile: { is: { isActive: filters.isActive } } }
+                            : {})
+            }
+            : {})
+    };
+
     const [users, total] = await Promise.all([
         prisma.user.findMany({
+            where: whereClause,
             select: {
                 id: true,
                 name: true,
@@ -178,7 +216,9 @@ const getAllUsers = async (queryOptions: TQueryOptions) => {
                 [queryOptions.sortBy]: queryOptions.sortOrder
             }
         }),
-        prisma.user.count()
+        prisma.user.count({
+            where: whereClause
+        })
     ]);
 
     return {
