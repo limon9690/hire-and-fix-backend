@@ -2249,6 +2249,7 @@ var bookingIncludeConfig = {
 };
 var BOOKING_WINDOW_START_MINUTES = 9 * 60;
 var BOOKING_WINDOW_END_MINUTES = 17 * 60;
+var STATUS_TIME_GRACE_MS = 30 * 1e3;
 var getMinutesFromIsoLocalTime = (isoDateTime) => {
   const timeMatch = isoDateTime.match(/T(\d{2}):(\d{2})/);
   if (!timeMatch) {
@@ -2513,14 +2514,16 @@ var updateBookingStatusByVendor = async (vendorUserId, bookingId, payload) => {
       `Invalid status transition from ${currentStatus} to ${targetStatus}`
     );
   }
-  const now = /* @__PURE__ */ new Date();
-  if (targetStatus === BookingStatus.IN_PROGRESS && now < booking.startTime) {
+  const now = Date.now();
+  const startTime = booking.startTime.getTime();
+  const endTime = booking.endTime.getTime();
+  if (targetStatus === BookingStatus.IN_PROGRESS && now + STATUS_TIME_GRACE_MS < startTime) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot start before service start time");
   }
   if (targetStatus === BookingStatus.COMPLETED && booking.paymentStatus !== PaymentStatus.SUCCESSFUL) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot be completed before payment is successful");
   }
-  if (targetStatus === BookingStatus.COMPLETED && now < booking.endTime) {
+  if (targetStatus === BookingStatus.COMPLETED && now < endTime) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot be completed before service end time");
   }
   const updatedBooking = await prisma.booking.update({
@@ -2567,14 +2570,16 @@ var updateBookingStatusByEmployee = async (employeeUserId, bookingId, payload) =
       `Invalid status transition from ${currentStatus} to ${targetStatus}`
     );
   }
-  const now = /* @__PURE__ */ new Date();
-  if (targetStatus === BookingStatus.IN_PROGRESS && now < booking.startTime) {
+  const now = Date.now();
+  const startTime = booking.startTime.getTime();
+  const endTime = booking.endTime.getTime();
+  if (targetStatus === BookingStatus.IN_PROGRESS && now + STATUS_TIME_GRACE_MS < startTime) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot start before service start time");
   }
   if (targetStatus === BookingStatus.COMPLETED && booking.paymentStatus !== PaymentStatus.SUCCESSFUL) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot be completed before payment is successful");
   }
-  if (targetStatus === BookingStatus.COMPLETED && now < booking.endTime) {
+  if (targetStatus === BookingStatus.COMPLETED && now < endTime) {
     throw new AppError_default(status12.BAD_REQUEST, "Booking cannot be completed before service end time");
   }
   const updatedBooking = await prisma.booking.update({
