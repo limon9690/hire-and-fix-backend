@@ -26,7 +26,14 @@ const getAllServiceCategories = catchAsync(async (req: Request, res: Response) =
         allowedSortFields: ["name", "description"]
     });
 
-    const result = await ServiceCategoryServices.getAllServiceCategories(queryOptions);
+    const searchTerm = typeof req.query.searchTerm === "string"
+        ? req.query.searchTerm.trim()
+        : undefined;
+
+    const result = await ServiceCategoryServices.getAllServiceCategories(
+        queryOptions,
+        searchTerm || undefined
+    );
 
     sendResponse(res, {
         statusCode: status.OK,

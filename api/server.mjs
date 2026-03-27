@@ -1230,7 +1230,83 @@ var getAllBookings = async (queryOptions, filters) => {
 };
 var getAllPayments = async (queryOptions, filters) => {
   const whereClause = {
-    ...filters.status && { status: filters.status }
+    ...filters.status && { status: filters.status },
+    ...filters.searchTerm && {
+      OR: [
+        {
+          id: {
+            contains: filters.searchTerm,
+            mode: "insensitive"
+          }
+        },
+        {
+          bookingId: {
+            contains: filters.searchTerm,
+            mode: "insensitive"
+          }
+        },
+        {
+          transactionId: {
+            contains: filters.searchTerm,
+            mode: "insensitive"
+          }
+        },
+        {
+          booking: {
+            user: {
+              name: {
+                contains: filters.searchTerm,
+                mode: "insensitive"
+              }
+            }
+          }
+        },
+        {
+          booking: {
+            user: {
+              email: {
+                contains: filters.searchTerm,
+                mode: "insensitive"
+              }
+            }
+          }
+        },
+        {
+          booking: {
+            vendor: {
+              vendorName: {
+                contains: filters.searchTerm,
+                mode: "insensitive"
+              }
+            }
+          }
+        },
+        {
+          booking: {
+            employee: {
+              user: {
+                name: {
+                  contains: filters.searchTerm,
+                  mode: "insensitive"
+                }
+              }
+            }
+          }
+        },
+        {
+          booking: {
+            employee: {
+              user: {
+                email: {
+                  contains: filters.searchTerm,
+                  mode: "insensitive"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
   };
   const [payments, total] = await Promise.all([
     prisma.payment.findMany({
@@ -1523,8 +1599,10 @@ var getAllPayments2 = catchAsync(async (req, res) => {
     req.query.status,
     Object.values(PaymentStatus)
   );
+  const searchTerm = typeof req.query.searchTerm === "string" ? req.query.searchTerm.trim() : void 0;
   const result = await AdminServices.getAllPayments(queryOptions, {
-    status: paymentStatus
+    status: paymentStatus,
+    searchTerm: searchTerm || void 0
   });
   sendResponse(res, {
     statusCode: status9.OK,

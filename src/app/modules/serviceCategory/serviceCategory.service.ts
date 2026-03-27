@@ -25,16 +25,38 @@ const createServiceCategory = async (payload: TCreateServiceCategoryPayload) => 
     return serviceCategory;
 };
 
-const getAllServiceCategories = async (queryOptions: TQueryOptions) => {
+const getAllServiceCategories = async (queryOptions: TQueryOptions, searchTerm?: string) => {
+    const whereClause = searchTerm
+        ? {
+            OR: [
+                {
+                    name: {
+                        contains: searchTerm,
+                        mode: "insensitive" as const
+                    }
+                },
+                {
+                    description: {
+                        contains: searchTerm,
+                        mode: "insensitive" as const
+                    }
+                }
+            ]
+        }
+        : {};
+
     const [serviceCategories, total] = await Promise.all([
         prisma.serviceCategory.findMany({
+            where: whereClause,
             skip: queryOptions.skip,
             take: queryOptions.limit,
             orderBy: {
                 [queryOptions.sortBy]: queryOptions.sortOrder
             }
         }),
-        prisma.serviceCategory.count()
+        prisma.serviceCategory.count({
+            where: whereClause
+        })
     ]);
 
     return {
